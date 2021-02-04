@@ -1,0 +1,18 @@
+name: 'autoupdate-branch'
+description: 'Update PRs with particular label'
+
+inputs:
+  repo-token:
+    description: 'Token of repo'
+    required: true
+  label:
+    description: 'Action will update branches with this label'
+    required: true
+
+outputs:
+  hasConflicts:
+    description: 'Says if PR is conflicted'
+
+runs:
+  using: 'node12'
+  main: 'dist/index.js'
