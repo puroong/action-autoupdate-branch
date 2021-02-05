@@ -22,3 +22,13 @@ jobs:
 ```
 - Add label to your Pull Request
 - That's it, now branches with particular label will be auto updated.
+
+## Outputs
+This action also returns some output in case you would like to use this in your workflow:
+```yaml
+outputs:
+  hasConflicts:
+    description: 'Says if PR is conflicted'
+  conflictedPullRequestJSON:
+    description: 'data of conflicted PR in JSON in shape {title: string, url: string}'
+```
