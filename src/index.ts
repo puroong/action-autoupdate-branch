@@ -20,6 +20,8 @@ async function main() {
     if (pr.labels.find(prLabel => prLabel.name === label)) {
       let detailedPr = {
         data: {
+          title: null,
+          html_url: null,
           mergeable: null,
         },
       };
@@ -46,6 +48,7 @@ async function main() {
 
       if (detailedPr.data.mergeable === false) {
         core.setOutput('hasConflicts', true);
+        core.setOutput('conflictedPullRequestJSON', JSON.stringify({title: detailedPr.data.title, url: detailedPr.data.html_url}));
       } else if (detailedPr.data.mergeable === true) {
         // UPDATE BRANCH
         await client.pulls.updateBranch({

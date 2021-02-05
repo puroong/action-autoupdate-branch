@@ -12,6 +12,8 @@ inputs:
 outputs:
   hasConflicts:
     description: 'Says if PR is conflicted'
+  conflictedPullRequestJSON:
+    description: 'data of conflicted PR in JSON'
 
 runs:
   using: 'node12'
