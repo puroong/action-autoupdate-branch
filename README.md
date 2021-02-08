@@ -30,5 +30,5 @@ outputs:
   hasConflicts:
     description: 'Says if PR is conflicted'
   conflictedPullRequestJSON:
-    description: 'data of conflicted PR in JSON in shape {title: string, url: string}'
+    description: 'data of conflicted PR in JSON in shape {title: string, url: string, user: {login, url, avatarUrl}}'
 ```
