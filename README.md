@@ -4,6 +4,10 @@
 
 A github action to auto update labeled branches with base branch.
 
+Action can do great work with Github automerge feature: [Automatically merging a pull request
+](https://docs.github.com/en/github/collaborating-with-issues-and-pull-requests/automatically-merging-a-pull-request)
+
+
 ## Usage
 - Add workflow to setup Github Actions:
 ```yaml
