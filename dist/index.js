@@ -5783,15 +5783,27 @@ function wrappy (fn, cb) {
 
 /***/ }),
 
-/***/ 144:
+/***/ 989:
 /***/ ((__unused_webpack_module, __webpack_exports__, __nccwpck_require__) => {
 
 "use strict";
+// ESM COMPAT FLAG
 __nccwpck_require__.r(__webpack_exports__);
-/* harmony import */ var _actions_core__WEBPACK_IMPORTED_MODULE_0__ = __nccwpck_require__(186);
-/* harmony import */ var _actions_core__WEBPACK_IMPORTED_MODULE_0___default = /*#__PURE__*/__nccwpck_require__.n(_actions_core__WEBPACK_IMPORTED_MODULE_0__);
-/* harmony import */ var _actions_github__WEBPACK_IMPORTED_MODULE_1__ = __nccwpck_require__(438);
-/* harmony import */ var _actions_github__WEBPACK_IMPORTED_MODULE_1___default = /*#__PURE__*/__nccwpck_require__.n(_actions_github__WEBPACK_IMPORTED_MODULE_1__);
+
+// EXTERNAL MODULE: ./node_modules/@actions/core/lib/core.js
+var core = __nccwpck_require__(186);
+// EXTERNAL MODULE: ./node_modules/@actions/github/lib/github.js
+var github = __nccwpck_require__(438);
+// CONCATENATED MODULE: ./src/utils/wait.ts
+function wait(ms) {
+    return new Promise(resolve => {
+        setTimeout(() => {
+            resolve();
+        }, ms);
+    });
+}
+
+// CONCATENATED MODULE: ./src/index.ts
 var __awaiter = (undefined && undefined.__awaiter) || function (thisArg, _arguments, P, generator) {
     function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
     return new (P || (P = Promise))(function (resolve, reject) {
@@ -5803,50 +5815,56 @@ var __awaiter = (undefined && undefined.__awaiter) || function (thisArg, _argume
 };
 
 
+
+function getPRDetails(pr, client) {
+    return __awaiter(this, void 0, void 0, function* () {
+        yield wait(500);
+        const details = yield client.pulls.get(Object.assign(Object.assign({}, github.context.repo), { pull_number: pr.number }));
+        if (details.data.mergeable !== null) {
+            return details;
+        }
+        else {
+            return getPRDetails(pr, client);
+        }
+    });
+}
+function registerAction(pr, client) {
+    return __awaiter(this, void 0, void 0, function* () {
+        const { data } = yield getPRDetails(pr, client);
+        if (data.mergeable) {
+            yield client.pulls.updateBranch(Object.assign(Object.assign({}, github.context.repo), { pull_number: pr.number }));
+        }
+        else {
+            core.setOutput('hasConflicts', true);
+            core.setOutput('conflictedPullRequestJSON', JSON.stringify({
+                title: data.title,
+                url: data.html_url,
+                user: {
+                    login: data.user.login,
+                    url: data.user.html_url,
+                    avatarUrl: data.user.avatarUrl
+                }
+            }));
+        }
+    });
+}
 function main() {
     return __awaiter(this, void 0, void 0, function* () {
-        const token = _actions_core__WEBPACK_IMPORTED_MODULE_0__.getInput('repo-token');
-        const label = _actions_core__WEBPACK_IMPORTED_MODULE_0__.getInput('label');
-        const client = (0,_actions_github__WEBPACK_IMPORTED_MODULE_1__.getOctokit)(token);
-        const baseBranch = _actions_github__WEBPACK_IMPORTED_MODULE_1__.context.payload.ref;
-        const pullsResponse = yield client.pulls.list(Object.assign(Object.assign({}, _actions_github__WEBPACK_IMPORTED_MODULE_1__.context.repo), { base: baseBranch, state: 'open' }));
-        const prs = pullsResponse.data;
-        for (const pr of prs) {
-            if (pr.labels.find(prLabel => prLabel.name === label)) {
-                let detailedPr = {
-                    data: {
-                        title: null,
-                        html_url: null,
-                        mergeable: null,
-                        user: null,
-                    },
-                };
-                const interval = setInterval(() => __awaiter(this, void 0, void 0, function* () {
-                    if (detailedPr.data.mergeable === null) {
-                        detailedPr = yield client.pulls.get(Object.assign(Object.assign({}, _actions_github__WEBPACK_IMPORTED_MODULE_1__.context.repo), { pull_number: pr.number }));
-                        return;
-                    }
-                    // remove the interval
-                    clearInterval(interval);
-                    if (detailedPr.data.mergeable === false) {
-                        _actions_core__WEBPACK_IMPORTED_MODULE_0__.setOutput('hasConflicts', true);
-                        _actions_core__WEBPACK_IMPORTED_MODULE_0__.setOutput('conflictedPullRequestJSON', JSON.stringify({
-                            title: detailedPr.data.title,
-                            url: detailedPr.data.html_url,
-                            user: {
-                                login: detailedPr.data.user.login,
-                                url: detailedPr.data.user.html_url,
-                                avatarUrl: detailedPr.data.user.avatarUrl
-                            }
-                        }));
-                    }
-                    else if (detailedPr.data.mergeable === true) {
-                        // UPDATE BRANCH
-                        yield client.pulls.updateBranch(Object.assign(Object.assign({}, _actions_github__WEBPACK_IMPORTED_MODULE_1__.context.repo), { pull_number: pr.number }));
-                    }
-                }), 500);
-            }
-        }
+        const token = core.getInput('repo-token');
+        const label = core.getInput('label');
+        const client = (0,github.getOctokit)(token);
+        const baseBranch = github.context.payload.ref;
+        const pullsResponse = yield client.pulls.list(Object.assign(Object.assign({}, github.context.repo), { base: baseBranch, state: 'open' }));
+        /*
+          Filter received Pull Request to get only those
+          which has proper label
+         */
+        const prs = (pullsResponse.data || []).filter(pr => pr.labels.find(prLabel => prLabel.name === label));
+        /*
+          Get details of Pull Requests and wait
+          till all of them will be executed
+         */
+        yield Promise.all(prs.map(pr => registerAction(pr, client)));
     });
 }
 main().catch(err => `autoupdate-branch action failed: ${err}`);
@@ -5998,35 +6016,6 @@ module.exports = require("zlib");;
 /******/ 	}
 /******/ 	
 /************************************************************************/
-/******/ 	/* webpack/runtime/compat get default export */
-/******/ 	(() => {
-/******/ 		// getDefaultExport function for compatibility with non-harmony modules
-/******/ 		__nccwpck_require__.n = (module) => {
-/******/ 			var getter = module && module.__esModule ?
-/******/ 				() => module['default'] :
-/******/ 				() => module;
-/******/ 			__nccwpck_require__.d(getter, { a: getter });
-/******/ 			return getter;
-/******/ 		};
-/******/ 	})();
-/******/ 	
-/******/ 	/* webpack/runtime/define property getters */
-/******/ 	(() => {
-/******/ 		// define getter functions for harmony exports
-/******/ 		__nccwpck_require__.d = (exports, definition) => {
-/******/ 			for(var key in definition) {
-/******/ 				if(__nccwpck_require__.o(definition, key) && !__nccwpck_require__.o(exports, key)) {
-/******/ 					Object.defineProperty(exports, key, { enumerable: true, get: definition[key] });
-/******/ 				}
-/******/ 			}
-/******/ 		};
-/******/ 	})();
-/******/ 	
-/******/ 	/* webpack/runtime/hasOwnProperty shorthand */
-/******/ 	(() => {
-/******/ 		__nccwpck_require__.o = (obj, prop) => Object.prototype.hasOwnProperty.call(obj, prop)
-/******/ 	})();
-/******/ 	
 /******/ 	/* webpack/runtime/make namespace object */
 /******/ 	(() => {
 /******/ 		// define __esModule on exports
@@ -6044,6 +6033,6 @@ module.exports = require("zlib");;
 /******/ 	// module exports must be returned from runtime so entry inlining is disabled
 /******/ 	// startup
 /******/ 	// Load entry module and return exports
-/******/ 	return __nccwpck_require__(144);
+/******/ 	return __nccwpck_require__(989);
 /******/ })()
 ;

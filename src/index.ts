@@ -1,5 +1,42 @@
 import * as core from '@actions/core';
 import {getOctokit, context} from '@actions/github';
+import {wait} from "./utils/wait";
+
+async function getPRDetails(pr, client) {
+  await wait(500);
+  const details = await client.pulls.get({
+    ...context.repo,
+    pull_number: pr.number,
+  });
+
+  if (details.data.mergeable !== null) {
+    return details;
+  } else {
+    return getPRDetails(pr, client)
+  }
+}
+
+async function registerAction(pr, client) {
+  const {data} = await getPRDetails(pr, client);
+
+  if (data.mergeable) {
+    await client.pulls.updateBranch({
+      ...context.repo,
+      pull_number: pr.number,
+    });
+  } else {
+    core.setOutput('hasConflicts', true);
+    core.setOutput('conflictedPullRequestJSON', JSON.stringify({
+      title: data.title,
+      url: data.html_url,
+      user: {
+        login: data.user.login,
+        url: data.user.html_url,
+        avatarUrl: data.user.avatarUrl
+      }
+    }));
+  }
+}
 
 async function main() {
   const token = core.getInput('repo-token');
@@ -13,52 +50,17 @@ async function main() {
     state: 'open',
   });
 
-  const prs = pullsResponse.data;
+  /*
+    Filter received Pull Request to get only those
+    which has proper label
+   */
+  const prs = (pullsResponse.data || []).filter(pr => pr.labels.find(prLabel => prLabel.name === label));
 
-  for (const pr of prs) {
-    if (pr.labels.find(prLabel => prLabel.name === label)) {
-      let detailedPr = {
-        data: {
-          title: null,
-          html_url: null,
-          mergeable: null,
-          user: null,
-        },
-      };
-
-      const interval = setInterval(async () => {
-        if (detailedPr.data.mergeable === null) {
-          detailedPr = await client.pulls.get({
-            ...context.repo,
-            pull_number: pr.number,
-          });
-
-          return;
-        }
-        // remove the interval
-        clearInterval(interval);
-
-        if (detailedPr.data.mergeable === false) {
-          core.setOutput('hasConflicts', true);
-          core.setOutput('conflictedPullRequestJSON', JSON.stringify({
-            title: detailedPr.data.title,
-            url: detailedPr.data.html_url,
-            user: {
-              login: detailedPr.data.user.login,
-              url: detailedPr.data.user.html_url,
-              avatarUrl: detailedPr.data.user.avatarUrl
-            }
-          }));
-        } else if (detailedPr.data.mergeable === true) {
-          // UPDATE BRANCH
-          await client.pulls.updateBranch({
-            ...context.repo,
-            pull_number: pr.number,
-          });
-        }
-      }, 500);
-    }
-  }
+  /*
+    Get details of Pull Requests and wait
+    till all of them will be executed
+   */
+  await Promise.all(prs.map(pr => registerAction(pr, client)))
 }
 
 main().catch(err => `autoupdate-branch action failed: ${err}`);
