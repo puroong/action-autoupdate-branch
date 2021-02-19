@@ -19,7 +19,7 @@ jobs:
         uses: actions/checkout@v2
       - name: Update branches
         uses: brainly/autoupdate-branch
-        id: autoUpdateBranche
+        id: autoUpdateBranch
         with:
           repo-token: "${{ secrets.GITHUB_TOKEN }}"
           label: 'YOUR LABEL NAME'
