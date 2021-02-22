@@ -1,5 +1,8 @@
 name: 'autoupdate-branch'
 description: 'Update PRs with particular label'
+branding:
+  icon: 'arrow-down-circle'  
+  color: 'gray-dark'
 
 inputs:
   repo-token:
