@@ -5860,6 +5860,8 @@ function main() {
           which has proper label
          */
         const prs = (pullsResponse.data || []).filter(pr => pr.labels.find(prLabel => prLabel.name === label));
+        const branchNames = prs.map(pr => pr.head.label).join(', ');
+        console.log(`Will attempt to update the following branches: ${branchNames}`);
         /*
           Get details of Pull Requests and wait
           till all of them will be executed
