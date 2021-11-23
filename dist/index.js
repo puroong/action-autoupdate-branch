@@ -5818,6 +5818,11 @@ var __awaiter = (undefined && undefined.__awaiter) || function (thisArg, _argume
 
 function getPRDetails(pr, client) {
     return __awaiter(this, void 0, void 0, function* () {
+        /*
+         * We want to wait some time after master merge to get info
+         * about potential conflicts because conflicts appear on PR
+         * with delay
+         */
         yield wait(500);
         const details = yield client.pulls.get(Object.assign(Object.assign({}, github.context.repo), { pull_number: pr.number }));
         if (details.data.mergeable !== null) {
@@ -5829,14 +5834,28 @@ function getPRDetails(pr, client) {
     });
 }
 function registerAction(pr, client) {
+    var _a;
     return __awaiter(this, void 0, void 0, function* () {
         const { data } = yield getPRDetails(pr, client);
         const requiredApprovals = parseInt(core.getInput('requiredApprovals') || '0', 10);
+        const requiredPassedChecks = core.getInput('requiredPassedChecks') === 'true';
+        if (requiredPassedChecks) {
+            const prBranchName = data.head.ref;
+            const checks = yield client.checks.listForRef(Object.assign(Object.assign({}, github.context.repo), { ref: prBranchName }));
+            const allChecks = ((_a = checks === null || checks === void 0 ? void 0 : checks.data) === null || _a === void 0 ? void 0 : _a.check_runs) || [];
+            const completedChecks = allChecks.filter((check) => check.status === 'completed');
+            const passedChecks = completedChecks.filter((check) => check.status === 'completed' &&
+                (check.conclusion === 'success' || check.conclusion === 'skipped'));
+            if (allChecks.length !== passedChecks.length) {
+                console.log(`PR #${pr.number} checks failed or still running, skipping update branch...`);
+                return;
+            }
+        }
         if (requiredApprovals) {
             const { data: reviews } = yield client.pulls.listReviews(Object.assign(Object.assign({}, github.context.repo), { pull_number: pr.number }));
-            const approvals = reviews.filter(review => review.state === 'APPROVED');
+            const approvals = reviews.filter((review) => review.state === 'APPROVED');
             if (approvals.length < requiredApprovals) {
-                console.log(`PR doesn't have ${requiredApprovals} approvals.`);
+                console.log(`PR #${pr.number} doesn't have ${requiredApprovals} approvals. Skipping update branch...`);
                 return;
             }
         }
@@ -5851,8 +5870,8 @@ function registerAction(pr, client) {
                 user: {
                     login: data.user.login,
                     url: data.user.html_url,
-                    avatarUrl: data.user.avatar_url
-                }
+                    avatarUrl: data.user.avatar_url,
+                },
             }));
         }
     });
@@ -5867,17 +5886,17 @@ function main() {
           Filter received Pull Request to get only those
           which has auto_merge enabled
          */
-        const prs = (pullsResponse.data || []).filter(pr => !!pr.auto_merge);
-        const branchNames = prs.map(pr => pr.head.label).join(', ');
+        const prs = (pullsResponse.data || []).filter((pr) => !!pr.auto_merge);
+        const branchNames = prs.map((pr) => pr.head.ref).join(', ');
         console.log(`Will attempt to update the following branches: ${branchNames}`);
         /*
           Get details of Pull Requests and wait
           till all of them will be executed
          */
-        yield Promise.all(prs.map(pr => registerAction(pr, client)));
+        yield Promise.all(prs.map((pr) => registerAction(pr, client)));
     });
 }
-main().catch(err => `autoupdate-branch action failed: ${err}`);
+main().catch((err) => `autoupdate-branch action failed: ${err}`);
 
 
 /***/ }),

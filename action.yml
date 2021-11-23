@@ -14,6 +14,9 @@ inputs:
   requiredApprovals:
     description: 'Number of required approvals before branch should be updated'
     required: false
+  requiredPassedChecks:
+    description: 'Flag setting if checks should passed before branch should be updated'
+    required: false
 
 outputs:
   hasConflicts:
