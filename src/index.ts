@@ -45,10 +45,10 @@ async function registerAction(pr, client) {
     )
 
     if (allChecks.length !== passedChecks.length) {
-      console.log(
-        `PR #${pr.number} checks failed or still running, skipping update branch...`
-      )
-      return
+      return {
+        merged: false,
+        message: `PR #${pr.number} checks failed or still running, skipping update branch...`,
+      }
     }
   }
 
@@ -61,10 +61,10 @@ async function registerAction(pr, client) {
     const approvals = reviews.filter((review) => review.state === 'APPROVED')
 
     if (approvals.length < requiredApprovals) {
-      console.log(
-        `PR #${pr.number} doesn't have ${requiredApprovals} approvals. Skipping update branch...`
-      )
-      return
+      return {
+        merged: false,
+        message: `PR #${pr.number} doesn't have ${requiredApprovals} approvals. Skipping update branch...`,
+      }
     }
   }
 
@@ -73,6 +73,11 @@ async function registerAction(pr, client) {
       ...context.repo,
       pull_number: pr.number,
     })
+
+    return {
+      merged: true,
+      message: `PR #${pr.number} updated successfully`,
+    }
   } else {
     core.setOutput('hasConflicts', true)
     core.setOutput(
@@ -88,10 +93,16 @@ async function registerAction(pr, client) {
       })
     )
   }
+
+  return {
+    merged: false,
+    message: `PR #${pr.number} is conflicted`,
+  }
 }
 
 async function main() {
   const token = core.getInput('repo-token')
+  const updateLimit = parseInt(core.getInput('update-limits'), 10) || Infinity
   const client = getOctokit(token)
   const baseBranch = context.payload.ref
 
@@ -105,7 +116,9 @@ async function main() {
     Filter received Pull Request to get only those
     which has auto_merge enabled
    */
-  const prs = (pullsResponse.data || []).filter((pr) => !!pr.auto_merge)
+  const prs = (pullsResponse.data || [])
+    .filter((pr) => !!pr.auto_merge)
+    .reverse()
 
   const branchNames = prs.map((pr) => pr.head.ref).join(', ')
   console.log(`Will attempt to update the following branches: ${branchNames}`)
@@ -114,7 +127,23 @@ async function main() {
     Get details of Pull Requests and wait
     till all of them will be executed
    */
-  await Promise.all(prs.map((pr) => registerAction(pr, client)))
+
+  let updatedBranches = 0
+
+  for (let i = 0; i < prs.length; i++) {
+    if (updatedBranches < updateLimit) {
+      const {merged, message} = await registerAction(prs[i], client)
+
+      if (merged) {
+        updatedBranches += 1
+      }
+
+      console.log(message)
+    } else {
+      console.log(`PR #${prs[i].number} skipped because is out of limit...`)
+      return
+    }
+  }
 }
 
 main().catch((err) => `autoupdate-branch action failed: ${err}`)

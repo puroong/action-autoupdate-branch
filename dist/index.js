@@ -5843,24 +5843,31 @@ function registerAction(pr, client) {
             const prBranchName = data.head.ref;
             const checks = yield client.checks.listForRef(Object.assign(Object.assign({}, github.context.repo), { ref: prBranchName }));
             const allChecks = ((_a = checks === null || checks === void 0 ? void 0 : checks.data) === null || _a === void 0 ? void 0 : _a.check_runs) || [];
-            const completedChecks = allChecks.filter((check) => check.status === 'completed');
-            const passedChecks = completedChecks.filter((check) => check.status === 'completed' &&
+            const passedChecks = allChecks.filter((check) => check.status === 'completed' &&
                 (check.conclusion === 'success' || check.conclusion === 'skipped'));
             if (allChecks.length !== passedChecks.length) {
-                console.log(`PR #${pr.number} checks failed or still running, skipping update branch...`);
-                return;
+                return {
+                    merged: false,
+                    message: `PR #${pr.number} checks failed or still running, skipping update branch...`,
+                };
             }
         }
         if (requiredApprovals) {
             const { data: reviews } = yield client.pulls.listReviews(Object.assign(Object.assign({}, github.context.repo), { pull_number: pr.number }));
             const approvals = reviews.filter((review) => review.state === 'APPROVED');
             if (approvals.length < requiredApprovals) {
-                console.log(`PR #${pr.number} doesn't have ${requiredApprovals} approvals. Skipping update branch...`);
-                return;
+                return {
+                    merged: false,
+                    message: `PR #${pr.number} doesn't have ${requiredApprovals} approvals. Skipping update branch...`,
+                };
             }
         }
         if (data.mergeable) {
             yield client.pulls.updateBranch(Object.assign(Object.assign({}, github.context.repo), { pull_number: pr.number }));
+            return {
+                merged: true,
+                message: `PR #${pr.number} updated successfully`,
+            };
         }
         else {
             core.setOutput('hasConflicts', true);
@@ -5874,11 +5881,16 @@ function registerAction(pr, client) {
                 },
             }));
         }
+        return {
+            merged: false,
+            message: `PR #${pr.number} is conflicted`,
+        };
     });
 }
 function main() {
     return __awaiter(this, void 0, void 0, function* () {
         const token = core.getInput('repo-token');
+        const updateLimit = parseInt(core.getInput('update-limits'), 10) || Infinity;
         const client = (0,github.getOctokit)(token);
         const baseBranch = github.context.payload.ref;
         const pullsResponse = yield client.pulls.list(Object.assign(Object.assign({}, github.context.repo), { base: baseBranch, state: 'open' }));
@@ -5886,14 +5898,29 @@ function main() {
           Filter received Pull Request to get only those
           which has auto_merge enabled
          */
-        const prs = (pullsResponse.data || []).filter((pr) => !!pr.auto_merge);
+        const prs = (pullsResponse.data || [])
+            .filter((pr) => !!pr.auto_merge)
+            .reverse();
         const branchNames = prs.map((pr) => pr.head.ref).join(', ');
         console.log(`Will attempt to update the following branches: ${branchNames}`);
         /*
           Get details of Pull Requests and wait
           till all of them will be executed
          */
-        yield Promise.all(prs.map((pr) => registerAction(pr, client)));
+        let updatedBranches = 0;
+        for (let i = 0; i < prs.length; i++) {
+            if (updatedBranches < updateLimit) {
+                const { merged, message } = yield registerAction(prs[i], client);
+                if (merged) {
+                    updatedBranches += 1;
+                }
+                console.log(message);
+            }
+            else {
+                console.log(`PR #${prs[i].number} skipped because is out of limit...`);
+                return;
+            }
+        }
     });
 }
 main().catch((err) => `autoupdate-branch action failed: ${err}`);

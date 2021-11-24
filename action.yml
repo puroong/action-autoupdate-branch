@@ -17,6 +17,9 @@ inputs:
   requiredPassedChecks:
     description: 'Flag setting if checks should passed before branch should be updated'
     required: false
+  update-limits:
+    description: 'Number of branches which should be updated in one run'
+    required: false
 
 outputs:
   hasConflicts:
