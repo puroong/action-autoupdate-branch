@@ -56,6 +56,7 @@ async function registerAction(pr, client) {
     const {data: reviews} = await client.pulls.listReviews({
       ...context.repo,
       pull_number: pr.number,
+      per_page: 100,
     })
 
     const approvals = reviews.filter((review) => review.state === 'APPROVED')
