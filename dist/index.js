@@ -5853,7 +5853,7 @@ function registerAction(pr, client) {
             }
         }
         if (requiredApprovals) {
-            const { data: reviews } = yield client.pulls.listReviews(Object.assign(Object.assign({}, github.context.repo), { pull_number: pr.number }));
+            const { data: reviews } = yield client.pulls.listReviews(Object.assign(Object.assign({}, github.context.repo), { pull_number: pr.number, per_page: 100 }));
             const approvals = reviews.filter((review) => review.state === 'APPROVED');
             if (approvals.length < requiredApprovals) {
                 return {
@@ -5891,15 +5891,18 @@ function main() {
     return __awaiter(this, void 0, void 0, function* () {
         const token = core.getInput('repo-token');
         const updateLimit = parseInt(core.getInput('update-limits'), 10) || Infinity;
+        const updateAllPullRequest = !!core.getInput('updateAllPullRequest');
         const client = (0,github.getOctokit)(token);
         const baseBranch = github.context.payload.ref;
         const pullsResponse = yield client.pulls.list(Object.assign(Object.assign({}, github.context.repo), { base: baseBranch, state: 'open' }));
         /*
           Filter received Pull Request to get only those
           which has auto_merge enabled
+      
+          if updateAllPullRequest is true, update all Pull Requests
          */
         const prs = (pullsResponse.data || [])
-            .filter((pr) => !!pr.auto_merge)
+            .filter((pr) => !!pr.auto_merge || updateAllPullRequest)
             .reverse();
         const branchNames = prs.map((pr) => pr.head.ref).join(', ');
         console.log(`Will attempt to update the following branches: ${branchNames}`);

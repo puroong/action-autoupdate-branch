@@ -104,6 +104,7 @@ async function registerAction(pr, client) {
 async function main() {
   const token = core.getInput('repo-token')
   const updateLimit = parseInt(core.getInput('update-limits'), 10) || Infinity
+  const updateAllPullRequest = !!core.getInput('updateAllPullRequest')
   const client = getOctokit(token)
   const baseBranch = context.payload.ref
 
@@ -116,9 +117,11 @@ async function main() {
   /*
     Filter received Pull Request to get only those
     which has auto_merge enabled
+
+    if updateAllPullRequest is true, update all Pull Requests
    */
   const prs = (pullsResponse.data || [])
-    .filter((pr) => !!pr.auto_merge)
+    .filter((pr) => !!pr.auto_merge || updateAllPullRequest)
     .reverse()
 
   const branchNames = prs.map((pr) => pr.head.ref).join(', ')
